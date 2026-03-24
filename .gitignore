@@ -1,0 +1,49 @@
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Pipeline outputs — raw CSVs ──────────────────────────────────
+# Raw scrape dumps (large, reproducible — don't commit)
+*_reviews_raw.csv
+
+# ── Pipeline outputs — cleaned CSVs ─────────────────────────────
+# Optional: remove the next line if you want to track cleaned data
+*_reviews_cleaned.csv
+
+# ── SQLite databases ─────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Jupyter / IPython ────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── macOS ────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Windows ──────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── IDEs ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Environment / secrets ────────────────────────────────────────
+.env
+.env.local
+*.key
