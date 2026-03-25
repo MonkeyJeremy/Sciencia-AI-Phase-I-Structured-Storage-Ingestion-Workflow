@@ -183,7 +183,6 @@ The dashboard (`app_review_analyzer.html`) is self-contained and requires no Pyt
 
 ## Roadmap
 
-- [ ] Apple App Store scraper (`apple_pipeline_1.py`)
 - [ ] Scheduled runs (cron / Airflow DAG)
 - [ ] PostgreSQL migration path
 - [ ] Phase II: NLP labelling interface
