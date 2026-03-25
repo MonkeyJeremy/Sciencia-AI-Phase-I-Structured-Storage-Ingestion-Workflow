@@ -1,0 +1,25 @@
+# Sciencia AI — Phase I: Data Ingestion & Infrastructure
+# Install with: pip install -r requirements.txt
+
+# ── Scraping ─────────────────────────────────────────────────────────────────
+google-play-scraper>=1.2.4
+
+# ── Language detection ────────────────────────────────────────────────────────
+langdetect>=1.0.9
+
+# ── Data manipulation ─────────────────────────────────────────────────────────
+pandas>=2.0.0
+numpy>=1.26.0
+
+# ── Visualisation (scraper diagnostics) ──────────────────────────────────────
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# ── Statistics ────────────────────────────────────────────────────────────────
+scipy>=1.12.0
+
+# ── Standard library (no install needed, listed for clarity) ─────────────────
+# sqlite3   — built into Python 3.x
+# hashlib   — built into Python 3.x
+# argparse  — built into Python 3.x
+# logging   — built into Python 3.x
