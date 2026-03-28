@@ -26,6 +26,9 @@ Google Play / App Store
    reviews.db  (SQLite)
         │
         ▼
+  [ Analysis ]  ──────────────────────────────  analyze_reviews.py
+        │
+        ▼
   [ Analyzer Dashboard ]  ────────────────────  app_review_analyzer.html
 ```
 
@@ -37,6 +40,7 @@ Google Play / App Store
 .
 ├── Google_scraper.py           # Google Play review scraper & cleaning pipeline
 ├── db_ingestion.py             # CSV → SQLite ingestion workflow
+├── analyze_reviews.py          # Python analysis script — 4-page chart report
 ├── app_review_analyzer.html    # Static dashboard for descriptive analysis
 ├── requirements.txt            # Python dependencies
 ├── CONTRIBUTING.md             # Contribution guidelines
@@ -44,6 +48,55 @@ Google Play / App Store
 ```
 
 > An Apple App Store scraper (`apple_pipeline_1.py`) follows the same interface as `Google_scraper.py` and produces an `apple_reviews_cleaned.csv` compatible with `db_ingestion.py`.
+
+---
+
+## Example: ChatGPT (Google Play)
+
+The pipeline was validated end-to-end using **ChatGPT** (`com.openai.chatgpt`) as the example app. Below is a summary of the results.
+
+### Dataset at a glance
+
+| Metric | Value |
+|---|---|
+| App | ChatGPT — Google Play (`com.openai.chatgpt`) |
+| Raw reviews scraped | ~25,000 |
+| After cleaning | **10,843** |
+| Date range | 2026-02-21 → 2026-03-15 (23 days) |
+| Unique users | 10,716 |
+| Avg star rating | 4.46 ★ |
+| Avg review length | 52 characters |
+| Avg word count | 9.9 words |
+
+### Sentiment distribution
+
+| Sentiment | Count | % |
+|---|---|---|
+| Positive (4–5 ★) | 9,386 | 86.6% |
+| Negative (1–2 ★) | 1,023 | 9.4% |
+| Neutral (3 ★) | 434 | 4.0% |
+
+### Key findings
+
+- **Negative reviews are 2.3× longer** than positive ones (avg 103 ch vs 45 ch) — providing richer NLP signal per sample despite class imbalance.
+- **Strong bimodal rating pattern** — 5★ (76.5%) and 1★ (7.4%) dominate; 2★ and 3★ are underrepresented.
+- **41% of reviews are under 5 words** — emoji-only entries pass the minimum length filter but carry limited NLP signal. A ≥ 10-word threshold is recommended for the training set.
+- **Kruskal-Wallis H = 500.13 (p < 0.001)** — review length differs significantly across star ratings.
+- **Spearman ρ = −0.202** — higher-rated reviews tend to be shorter.
+- **500-character truncation** — Google Play's hard character limit was hit by multiple reviewers; some feedback is incomplete.
+
+### Ingestion run audit
+
+| Field | Value |
+|---|---|
+| Run ID | 1 |
+| Timestamp (UTC) | 2026-03-27 23:56:42 |
+| Source file | `chatgpt_reviews_cleaned.csv` |
+| Rows in file | 10,843 |
+| Rows inserted | 10,843 |
+| Rows skipped (duplicates) | 0 |
+| Rows rejected | 0 |
+| Status | SUCCESS |
 
 ---
 
@@ -76,9 +129,7 @@ TARGET   = 25_000                  # raw reviews to fetch before cleaning
 
 ```bash
 # Single platform
-python db_ingestion.py \
-    --source chatgpt_reviews_cleaned.csv \
-    --platform googleplay
+python db_ingestion.py --source chatgpt_reviews_cleaned.csv --platform googleplay
 
 # Both platforms at once
 python db_ingestion.py \
@@ -86,19 +137,51 @@ python db_ingestion.py \
     --source2 apple_reviews_cleaned.csv      --platform2 apple
 
 # Dry-run (validate without writing)
-python db_ingestion.py \
-    --source chatgpt_reviews_cleaned.csv \
-    --platform googleplay \
-    --dry-run
+python db_ingestion.py --source chatgpt_reviews_cleaned.csv --platform googleplay --dry-run
 
 # Custom database path
-python db_ingestion.py \
-    --source chatgpt_reviews_cleaned.csv \
-    --platform googleplay \
-    --db reviews_prod.db
+python db_ingestion.py --source chatgpt_reviews_cleaned.csv --platform googleplay --db reviews_prod.db
 ```
 
-### 4. Open the dashboard
+### 4. Analyse the database
+
+```bash
+python analyze_reviews.py
+# Outputs four chart pages:
+#   page1_overview.png   — distributions & descriptive stats
+#   page2_temporal.png   — monthly & daily trends
+#   page3_stats.png      — statistical tests & correlations
+#   page4_quality.png    — data quality audit
+```
+
+You can also query the database directly in Python:
+
+```python
+import sqlite3
+import pandas as pd
+
+conn = sqlite3.connect("reviews.db")
+
+# Sentiment distribution
+pd.read_sql("""
+    SELECT sentiment, COUNT(*) AS n
+    FROM sentiment_labels
+    GROUP BY sentiment ORDER BY n DESC
+""", conn)
+
+# Avg star rating per month
+pd.read_sql("""
+    SELECT strftime('%Y-%m', review_date) AS month,
+           ROUND(AVG(star_rating), 2)     AS avg_star,
+           COUNT(*)                        AS n
+    FROM reviews
+    GROUP BY month ORDER BY month
+""", conn)
+
+conn.close()
+```
+
+### 5. Open the dashboard
 
 Open `app_review_analyzer.html` in any modern browser — no server required. Enter an app name, select a platform, and click **Analyze**.
 
@@ -154,14 +237,14 @@ Derived columns added after cleaning: `review_length`, `word_count`, `sentiment`
 
 ## Quality Targets
 
-| Metric | Target |
-|---|---|
-| Dataset size | ≥ 10,000 cleaned reviews |
-| Retention rate | ≥ 80% of raw reviews |
-| Null `star_rating` | < 5% |
-| Duplicate review IDs | 0 |
-| Class imbalance (Pos:Neu) | < 10× |
-| Low-signal reviews (< 5 words) | < 20% |
+| Metric | Target | ChatGPT result |
+|---|---|---|
+| Dataset size | ≥ 10,000 cleaned reviews | 10,843 ✓ |
+| Retention rate | ≥ 80% of raw reviews | ~43% ⚠ (high non-English drop) |
+| Null `star_rating` | < 5% | 0% ✓ |
+| Duplicate review IDs | 0 | 0 ✓ |
+| Class imbalance (Pos:Neu) | < 10× | ~21.6× ⚠ |
+| Low-signal reviews (< 5 words) | < 20% | 41% ⚠ |
 
 ---
 
@@ -174,7 +257,7 @@ See `requirements.txt`. Key packages:
 | `google-play-scraper` | Google Play review API wrapper |
 | `langdetect` | Language identification |
 | `pandas` | Data manipulation |
-| `matplotlib` / `seaborn` | Plotting (scraper diagnostics) |
+| `matplotlib` / `seaborn` | Plotting (scraper diagnostics & analysis) |
 | `scipy` | Statistical utilities |
 
 The dashboard (`app_review_analyzer.html`) is self-contained and requires no Python dependencies — Chart.js is loaded from CDN.
@@ -183,6 +266,7 @@ The dashboard (`app_review_analyzer.html`) is self-contained and requires no Pyt
 
 ## Roadmap
 
+- [ ] Apple App Store scraper (`apple_pipeline_1.py`)
 - [ ] Scheduled runs (cron / Airflow DAG)
 - [ ] PostgreSQL migration path
 - [ ] Phase II: NLP labelling interface
@@ -190,6 +274,9 @@ The dashboard (`app_review_analyzer.html`) is self-contained and requires no Pyt
 
 ---
 
+## License
+
+Internal project — Sciencia AI. Not for public distribution.
 ## License
 
 Internal project — Sciencia AI. Not for public distribution.
