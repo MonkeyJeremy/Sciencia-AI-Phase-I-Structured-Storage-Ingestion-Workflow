@@ -1,7 +1,7 @@
 # Sciencia AI — Phase I: Data Ingestion & Infrastructure
 
-> **Pipeline stage:** Data Acquisition → Cleaning → Structured Storage  
-> **Status:** Phase I complete
+> **Pipeline stage:** Data Acquisition → Cleaning → Structured Storage → Splitting → Feature Engineering
+> **Status:** Phase I complete · Steps 4 & 5 added
 
 ---
 
@@ -30,6 +30,19 @@ Google Play / App Store
         │
         ▼
   [ Analyzer Dashboard ]  ────────────────────  app_review_analyzer.html
+        │
+        ▼
+  [ Split ]  ─────────────────────────────────  split_dataset.py
+        │         time-based, stratified
+        ▼
+   splits/  (train.csv / val.csv / test.csv)
+        │
+        ▼
+  [ Feature Engineering ]  ───────────────────  feature_engineering.py
+        │         TF-IDF, metadata, TextBlob,
+        │         aspect keyword flags
+        ▼
+   outputs/features/  (model-ready matrices)
 ```
 
 ---
@@ -38,10 +51,12 @@ Google Play / App Store
 
 ```
 .
-├── Google_scraper.py           # Google Play review scraper & cleaning pipeline
-├── db_ingestion.py             # CSV → SQLite ingestion workflow
-├── analyze_reviews.py          # Python analysis script — 4-page chart report
-├── app_review_analyzer.html    # Static dashboard for descriptive analysis
+├── Google_scraper.py           # Step 1–2: Google Play review scraper & cleaning pipeline
+├── db_ingestion.py             # Step 3:   CSV → SQLite ingestion workflow
+├── analyze_reviews.py          # Step 3b:  Python analysis script — 4-page chart report
+├── app_review_analyzer.html    #           Static dashboard for descriptive analysis
+├── split_dataset.py            # Step 4:   Time-based stratified dataset splitting
+├── feature_engineering.py      # Step 5:   TF-IDF, metadata, TextBlob & aspect features
 ├── requirements.txt            # Python dependencies
 ├── CONTRIBUTING.md             # Contribution guidelines
 └── README.md
@@ -185,6 +200,53 @@ conn.close()
 
 Open `app_review_analyzer.html` in any modern browser — no server required. Enter an app name, select a platform, and click **Analyze**.
 
+### 6. Split the dataset
+
+```bash
+# Default 70 / 15 / 15 split on all platforms
+python split_dataset.py
+
+# Filter to a single platform or app
+python split_dataset.py --platform googleplay --app "ChatGPT"
+
+# Custom ratios
+python split_dataset.py --train 0.75 --val 0.10 --test 0.15
+
+# Dry-run (print stats without writing files)
+python split_dataset.py --dry-run
+# Outputs:
+#   splits/train.csv
+#   splits/val.csv
+#   splits/test.csv
+```
+
+> The splitter sorts by `review_date` before cutting, preventing temporal leakage. Within-split oversampling corrects the ~21.6× class imbalance identified in the EDA.
+
+### 7. Build feature matrices
+
+```bash
+# Default: reads splits/ produced by split_dataset.py
+python feature_engineering.py
+
+# TF-IDF tuning
+python feature_engineering.py --max-features 20000 --ngram-max 3
+
+# Skip optional feature families
+python feature_engineering.py --no-textblob
+python feature_engineering.py --no-aspects
+
+# Dry-run (validate inputs without writing features)
+python feature_engineering.py --dry-run
+# Outputs (in outputs/features/):
+#   tfidf_{train,val,test}.npz       sparse TF-IDF matrices
+#   meta_{train,val,test}.csv        numeric metadata features
+#   textblob_{train,val,test}.csv    polarity & subjectivity scores
+#   aspects_{train,val,test}.csv     aspect keyword flags
+#   labels_{train,val,test}.csv      aligned sentiment labels
+#   tfidf_vectorizer.pkl             fitted vectorizer (for inference)
+#   feature_report.txt               human-readable validation report
+```
+
 ---
 
 ## Database Schema
@@ -258,7 +320,9 @@ See `requirements.txt`. Key packages:
 | `langdetect` | Language identification |
 | `pandas` | Data manipulation |
 | `matplotlib` / `seaborn` | Plotting (scraper diagnostics & analysis) |
-| `scipy` | Statistical utilities |
+| `scipy` | Statistical utilities & sparse matrix I/O |
+| `scikit-learn` | TF-IDF vectorisation, metadata scaling (`split_dataset.py`, `feature_engineering.py`) |
+| `textblob` | Rule-based polarity & subjectivity scores (`feature_engineering.py`) |
 
 The dashboard (`app_review_analyzer.html`) is self-contained and requires no Python dependencies — Chart.js is loaded from CDN.
 
@@ -267,6 +331,8 @@ The dashboard (`app_review_analyzer.html`) is self-contained and requires no Pyt
 ## Roadmap
 
 - [ ] Apple App Store scraper (`apple_pipeline_1.py`)
+- [x] Step 4: Time-based stratified dataset splitting (`split_dataset.py`)
+- [x] Step 5: Feature engineering pipeline (`feature_engineering.py`)
 - [ ] Scheduled runs (cron / Airflow DAG)
 - [ ] PostgreSQL migration path
 - [ ] Phase II: NLP labelling interface
@@ -274,9 +340,6 @@ The dashboard (`app_review_analyzer.html`) is self-contained and requires no Pyt
 
 ---
 
-## License
-
-Internal project — Sciencia AI. Not for public distribution.
 ## License
 
 Internal project — Sciencia AI. Not for public distribution.
